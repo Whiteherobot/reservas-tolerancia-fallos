@@ -1,95 +1,92 @@
-version: '3.8'
+# Solo el gateway queda expuesto; el resto se habla por la red interna.
+x-servicio: &servicio
+  build: .
+  image: reservas-tolerancia-fallos
+  restart: unless-stopped
+  init: true
+
+x-salud: &salud
+  interval: 5s
+  timeout: 3s
+  retries: 10
 
 services:
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    networks:
-      - reservas-net
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis:/data
     healthcheck:
+      <<: *salud
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
 
   api-gateway:
-    build:
-      context: .
-      dockerfile: services/api-gateway/Dockerfile
+    <<: *servicio
+    command: ["node", "services/api-gateway/index.js"]
     ports:
-      - "3000:3000"
+      - "${PUERTO:-3000}:3000"
     environment:
-      - PORT=3000
-      - REDIS_URL=redis://redis:6379
-      - RESERVAS_URL=http://reservas:3001
-      - INVENTARIO_URL=http://inventario:3002
-      - PAGOS_URL=http://pagos:3003
-      - NOTIFICACIONES_URL=http://notificaciones:3004
+      PORT: 3000
+      RESERVAS_URL: http://reservas:3001
+      INVENTARIO_URL: http://inventario:3002
+      PAGOS_URL: http://pagos:3003
+      NOTIFICACIONES_URL: http://notificaciones:3004
     depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - reservas-net
+      reservas: { condition: service_healthy }
+    healthcheck:
+      <<: *salud
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
 
   reservas:
-    build:
-      context: .
-      dockerfile: services/reservas/Dockerfile
-    ports:
-      - "3001:3001"
+    <<: *servicio
+    command: ["node", "services/reservas/index.js"]
     environment:
-      - PORT=3001
-      - REDIS_URL=redis://redis:6379
-      - INVENTARIO_URL=http://inventario:3002
-      - PAGOS_URL=http://pagos:3003
-      - NOTIFICACIONES_URL=http://notificaciones:3004
+      PORT: 3001
+      REDIS_URL: redis://redis:6379
+      INVENTARIO_URL: http://inventario:3002
+      PAGOS_URL: http://pagos:3003
+      NOTIFICACIONES_URL: http://notificaciones:3004
+      TIMEOUT_PAGO_MS: 5000
+      PLAZO_PAGO_MS: 60000
     depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - reservas-net
+      redis: { condition: service_healthy }
+      inventario: { condition: service_healthy }
+      pagos: { condition: service_healthy }
+      notificaciones: { condition: service_healthy }
+    healthcheck:
+      <<: *salud
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/health"]
 
   inventario:
-    build:
-      context: .
-      dockerfile: services/inventario/Dockerfile
-    ports:
-      - "3002:3002"
+    <<: *servicio
+    command: ["node", "services/inventario/index.js"]
     environment:
-      - PORT=3002
-      - REDIS_URL=redis://redis:6379
-      - SIMULAR_FALLO=false
+      PORT: 3002
+      REDIS_URL: redis://redis:6379
     depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - reservas-net
+      redis: { condition: service_healthy }
+    healthcheck:
+      <<: *salud
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3002/health"]
 
   pagos:
-    build:
-      context: .
-      dockerfile: services/pagos/Dockerfile
-    ports:
-      - "3003:3003"
+    <<: *servicio
+    command: ["node", "services/pagos/index.js"]
     environment:
-      - PORT=3003
-      - SIMULAR_LATENCIA=false
-      - LATENCIA_MS=20000
-    networks:
-      - reservas-net
+      PORT: 3003
+      PROB_RECHAZO: "0.05"
+    healthcheck:
+      <<: *salud
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3003/health"]
 
   notificaciones:
-    build:
-      context: .
-      dockerfile: services/notificaciones/Dockerfile
-    ports:
-      - "3004:3004"
+    <<: *servicio
+    command: ["node", "services/notificaciones/index.js"]
     environment:
-      - PORT=3004
-    networks:
-      - reservas-net
+      PORT: 3004
+    healthcheck:
+      <<: *salud
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3004/health"]
 
-networks:
-  reservas-net:
-    driver: bridge
+volumes:
+  redis:
