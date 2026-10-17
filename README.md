@@ -1,459 +1,106 @@
-#  Sistema de Reservas con Tolerancia a Fallos
+# reservas-tolerancia-fallos
 
-##  Descripción
+[![CI](https://github.com/Whiteherobot/reservas-tolerancia-fallos/actions/workflows/ci.yml/badge.svg)](https://github.com/Whiteherobot/reservas-tolerancia-fallos/actions/workflows/ci.yml)
 
-Este es un **sistema distribuido de reserva de entradas** para eventos implementado con patrones avanzados de **tolerancia a fallos y resiliencia**. El sistema está diseñado para manejar fallos críticos sin colapsar, manteniendo alta disponibilidad y consistencia de datos incluso bajo condiciones adversas.
+Venta de entradas con microservicios en Node.js que siguen funcionando cuando
+algo falla: el inventario se cae, la pasarela de pagos se vuelve lenta, llegan
+demasiadas peticiones o varios usuarios compiten por el último asiento. Proyecto
+de Sistemas Distribuidos (enero de 2026), hecho en pareja.
 
-###  Objetivo
-Demostrar cómo construir sistemas robustos en microservicios que sigan siendo funcionales cuando diferentes componentes fallan.
+![Panel](docs/panel.png)
 
-##  Inicio Rapido
-
-### Opcion 1: Docker (RECOMENDADO para pruebas de fallos)
-
-```powershell
-# 1. Construir e iniciar todos los servicios
-docker-compose up --build -d
-
-# 2. Acceder al panel web
-# Abre http://localhost:3000 en tu navegador
-
-# 3. Ejecutar script de pruebas automaticas
-.\test-fallos.ps1
-
-# 4. Ver documentacion completa de pruebas
-# Lee PRUEBAS_DOCKER.md
-```
-
-### Opcion 2: Ejecucion Local
-
-```powershell
-# 1. Instalar dependencias
-npm install
-
-# 2. Iniciar todos los servicios
-npm start
-
-# 3. Acceder al panel web
-# Abre http://localhost:3000 en tu navegador
-```
-
-##  Arquitectura
+## Arquitectura
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    🖥️ Clientes Web                            │
-└────────────────────────┬─────────────────────────────────────┘
-                         │
-                         ▼
-┌──────────────────────────────────────────────────────────────┐
-│                   🚪 API Gateway                              │
-│  ✓ Rate Limiting (100 req/min, 20 req/min para reservas)    │
-│  ✓ Circuit Breaker                                          │
-│  ✓ Bulkhead (50 conexiones máximas)                         │
-└────────────────────────┬─────────────────────────────────────┘
-                         │
-         ┌───────────────┼───────────────┬──────────────┐
-         │               │               │              │
-         ▼               ▼               ▼              ▼
-┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-│  📅 Reservas │ │ 📊 Inventario│ │ 💳 Pagos    │ │📬Notificaciones│
-│             │ │             │ │             │ │             │
-│ • Redlock   │ │ • Simula    │ │ • Simula    │ │ • Email/SMS │
-│ • Saga      │ │   caída     │ │   latencia  │ │             │
-│ • Retry     │ │ • Operaciones│ │   (20s)    │ │             │
-│             │ │   atómicas  │ │             │ │             │
-└──────┬──────┘ └──────┬──────┘ └─────────────┘ └─────────────┘
-       │               │
-       └───────┬───────┘
-               ▼
-       ┌─────────────────┐
-       │   📦 Redis      │
-       │  • Almacenamiento │
-       │  • Locks          │
-       │  • Caché          │
-       └─────────────────┘
+navegador ──> api-gateway :3000 ──> reservas ──> inventario ──> Redis
+              rate limiting          │  conciliador  (asientos)
+              bulkhead               ├──> pagos (pasarela simulada)
+              cartelera en caché     └──> notificaciones
 ```
 
-### Componentes
+| Servicio | Qué hace |
+|---|---|
+| `api-gateway` | Sirve el panel, limita peticiones por cliente, reparte la carga con un bulkhead, guarda la última cartelera y corre las demostraciones. |
+| `reservas` | Orquesta la reserva: asigna asientos, cobra, confirma o compensa. Guarda las reservas en Redis y concilia lo que quedó a medias. |
+| `inventario` | Asientos por evento en Redis. Asignar y liberar son atómicos e idempotentes (scripts Lua). |
+| `pagos` | Pasarela de pagos simulada: un pago por reserva, rechazo del 5 % y latencia configurable. |
+| `notificaciones` | Correos simulados. Si falla, la reserva sigue valiendo y el correo se reintenta. |
 
-| Servicio | Puerto | Función |
-|----------|--------|---------|
-| **API Gateway** | 3000 | Enrutador central, limitación de tasa, protección |
-| **Reservas** | 3001 | Gestión de reservas y transacciones |
-| **Inventario** | 3002 | Control de disponibilidad de asientos |
-| **Pagos** | 3003 | Procesamiento de pagos |
-| **Notificaciones** | 3004 | Envío de confirmaciones (simulado) |
-| **Redis** | 6379 | Base de datos distribuida, locks, caché |
+Una reserva termina `confirmada` (201), `pago-pendiente` (202), `rechazada`
+(409 sin asientos, 402 pago rechazado, 503 inventario caído) o `cancelada`.
 
-##  Fallos Implementados
+## Los cuatro fallos
 
-El sistema simula y gestiona 4 escenarios críticos de fallo:
+| Fallo | Patrones |
+|---|---|
+| Inventario fantasma | Circuit breaker, reintentos con espera exponencial, cartelera en caché solo de lectura |
+| Pasarela lenta | Timeout, estado pendiente (202), conciliación en segundo plano, pago idempotente |
+| Diluvio de peticiones | Rate limiting, bulkhead con cola acotada, load shedding |
+| Condición de carrera | Asignación atómica en Redis |
 
-| # | Fallo | Síntoma | Patrón Aplicado |
-|---|-------|---------|-----------------|
-| 1️⃣ | **Inventario Fantasma** | El servicio de inventario cae completamente | Circuit Breaker + Timeout |
-| 2️⃣ | **Pasarela Lenta** | El servicio de pagos responde en 20 segundos | Timeout + Bulkhead |
-| 3️⃣ | **Diluvio de Peticiones** | Sobrecarga del API Gateway | Rate Limiting + Bulkhead |
-| 4️⃣ | **Condición de Carrera** | Múltiples usuarios compran el último asiento | Redlock Distribuido |
+El detalle de cada uno, y qué estaba mal en la versión original, está en
+[docs/fallos.md](docs/fallos.md).
 
-Cada fallo tiene su **documentación detallada** en la carpeta `docs/` con explicaciones técnicas y soluciones.
-##  Instalación y Ejecución
+![Inventario caído](docs/inventario-caido.png)
 
-###  Requisitos Previos
-
-- **Node.js** 18 o superior
-- **Docker** y **Docker Compose**
-- **Git**
-
-###  Instalación Rápida (Con Docker)
+## Cómo correrlo
 
 ```bash
-# 1. Clonar el repositorio
-git clone <repo-url>
-cd SistemadeReservas
-
-# 2. Instalar dependencias
-npm install
-
-# 3. Iniciar todos los servicios
-docker-compose up -d
-
-# 4. Ver logs en tiempo real
-docker-compose logs -f
+docker compose up -d --build     # panel en http://localhost:3000
+node scripts/demo.js pasarela-lenta
+docker compose down -v
 ```
 
-**El sistema estará disponible en** `http://localhost:3000`
+Con `PUERTO=8080 docker compose up -d` cambia el puerto del panel. Solo el
+gateway queda expuesto; los demás servicios se hablan por la red interna.
 
-###  Ejecución Manual (Sin Docker)
-
-Si prefieres ejecutar cada servicio en una terminal separada:
+Sin Docker hace falta un Redis local (`REDIS_URL`, por defecto
+`redis://localhost:6379`):
 
 ```bash
-# Terminal 1 - Redis
-docker run -p 6379:6379 redis:7-alpine
-
-# Terminal 2 - API Gateway
-npm run start:gateway
-
-# Terminal 3 - Servicio de Reservas
-npm run start:reservas
-
-# Terminal 4 - Servicio de Inventario
-npm run start:inventario
-
-# Terminal 5 - Servicio de Pagos
-npm run start:pagos
-
-# Terminal 6 - Servicio de Notificaciones
-npm run start:notificaciones
+npm ci
+npm start                        # levanta los cinco servicios
 ```
 
-###  Ver Métricas y Estado
+### API
+
+| Método | Ruta | |
+|---|---|---|
+| GET | `/api/inventario` | Cartelera. Si viene de la copia, trae el encabezado `X-Desde-Cache` con la edad en segundos. |
+| POST | `/api/reservas` | `{ "eventoId": "evento-1", "asientos": 2, "usuario": "ana@correo.ec" }`. Con `Idempotency-Key` se puede reintentar sin duplicar. |
+| GET | `/api/reservas` · `/api/reservas/:id` | Últimas 50 reservas o una. |
+| DELETE | `/api/reservas/:id` | Cancela: reembolsa el pago y devuelve los asientos. |
+| GET | `/api/estado` | Servicios, circuit breakers, bulkhead y métricas medidas (latencia p50/p95, solicitudes del último minuto). |
+| POST | `/demo/:nombre` | `inventario-fantasma`, `pasarela-lenta`, `diluvio-peticiones`, `condicion-carrera`. |
+
+## Pruebas
+
 ```bash
-# Estado del sistema
-curl http://localhost:3000/health
-
-# Métricas del API Gateway
-curl http://localhost:3000/metrics
+docker run -d --rm -p 6379:6379 redis:7-alpine
+REDIS_URL=redis://localhost:6379/15 npm test
 ```
 
-##  Ejecución de Demos
-
-Cada demo simula un fallo específico y demuestra cómo el sistema sigue funcionando:
-
-### Demo 1️ - Inventario Fantasma
-Simula la **caída completa del servicio de inventario**.
-```bash
-npm run demo:inventario-caida
-```
-**Aprenderás:** Cómo el Circuit Breaker previene fallos en cascada.
-
-### Demo 2️ - Pasarela Lenta
-Simula el servicio de pagos respondiendo en **20 segundos**.
-```bash
-npm run demo:pasarela-lenta
-```
-**Aprenderás:** Cómo el Timeout y Retry manejan servicios lentos.
-
-### Demo 3️ - Diluvio de Peticiones
-Simula **100+ peticiones simultáneas** al API Gateway.
-```bash
-npm run demo:diluvio-peticiones
-```
-**Aprenderás:** Cómo Rate Limiting y Bulkhead protegen el sistema.
-
-### Demo 4️ - Condición de Carrera
-Múltiples usuarios intentan comprar el **último asiento**.
-```bash
-npm run demo:condicion-carrera
-```
-**Aprenderás:** Cómo Redlock garantiza transacciones seguras.
-
----
-
-**  Documentación Detallada de Cada Fallo:**
-- [Fallo #1 - Inventario Fantasma](docs/FALLO-1-INVENTARIO-FANTASMA.md)
-- [Fallo #2 - Pasarela Lenta](docs/FALLO-2-PASARELA-LENTA.md)
-- [Fallo #3 - Diluvio de Peticiones](docs/FALLO-3-DILUVIO-PETICIONES.md)
-- [Fallo #4 - Condición de Carrera](docs/FALLO-4-CONDICION-CARRERA.md)
-
-##  Configuración
-
-### Variables de Entorno
-
-Crea un archivo `.env` en la raíz del proyecto:
-
-```env
-# API Gateway
-API_GATEWAY_PORT=3000
-REDIS_URL=redis://localhost:6379
-
-# Servicio de Inventario
-INVENTARIO_PORT=3002
-SIMULAR_FALLO=false                    # true para activar caída simulada
-
-# Servicio de Pagos
-PAGOS_PORT=3003
-SIMULAR_LATENCIA=false                 # true para activar latencia simulada
-LATENCIA_MS=20000                      # Milisegundos de latencia
-
-# Servicio de Reservas
-RESERVAS_PORT=3001
-```
-
-### Configuración de Patrones
-
-Cada patrón se puede ajustar en `shared/resilience-patterns.js`:
-
-- **Circuit Breaker:** Timeout, umbral de errores, tiempo de reinicio
-- **Rate Limiting:** Límite de peticiones, ventana de tiempo
-- **Bulkhead:** Conexiones máximas por servicio
-- **Redlock:** TTL, reintentos, retardo
-
-##  API REST - Endpoints Principales
-
-###  API Gateway (`localhost:3000`)
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| GET | `/health` | Verificación de salud del sistema |
-| GET | `/metrics` | Métricas y estadísticas en tiempo real |
-| GET | `/api/reservas` | Listar todas las reservas |
-| POST | `/api/reservas` | Crear una nueva reserva |
-| GET | `/api/reservas/:id` | Obtener detalles de una reserva |
-| DELETE | `/api/reservas/:id` | Cancelar una reserva |
-
-###  Servicio de Reservas (`localhost:3001`)
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| GET | `/reservas` | Listar reservas |
-| POST | `/reservas` | Crear reserva (requiere lock distribuido) |
-| GET | `/reservas/:id` | Obtener detalles |
-| DELETE | `/reservas/:id` | Cancelar reserva |
-
-###  Servicio de Inventario (`localhost:3002`)
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| GET | `/inventario` | Listar eventos |
-| GET | `/inventario/:eventoId` | Consultar disponibilidad |
-| POST | `/inventario/:eventoId/reservar` | Reservar asientos |
-| POST | `/inventario/:eventoId/liberar` | Liberar asientos |
-| POST | `/admin/simular-fallo` | Activar/desactivar simulación |
-
-###  Servicio de Pagos (`localhost:3003`)
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| POST | `/pagos/procesar` | Procesar pago |
-| GET | `/pagos/transaccion/:id` | Consultar transacción |
-| POST | `/pagos/reembolsar` | Reembolsar pago |
-| POST | `/admin/simular-latencia` | Activar/desactivar simulación |
-
-###  Servicio de Notificaciones (`localhost:3004`)
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| POST | `/notificaciones/enviar` | Enviar notificación |
-| GET | `/notificaciones/historial` | Ver historial de envíos |
-
-##  Patrones de Resiliencia Implementados
-
-### 1️ Circuit Breaker
-**Propósito:** Evitar llamadas a servicios que están caídos.
-
-- **Librería:** Opossum
-- **Timeout:** 5 segundos
-- **Umbral de error:** 50% de fallos
-- **Tiempo de reinicio:** 10-15 segundos
-- **Volumen mínimo:** 3-10 solicitudes antes de abrir el circuito
-
-**Ejemplo de uso:**
-```javascript
-const breaker = new CircuitBreaker(fetchData, {
-  timeout: 5000,
-  errorThresholdPercentage: 50
-});
-```
-
-### 2️ Retry con Backoff Exponencial
-**Propósito:** Reintentar peticiones fallidas con espera creciente.
-
-- **Máximo de intentos:** 3 reintentos
-- **Retraso inicial:** 1 segundo
-- **Factor exponencial:** 2x
-- **Retraso máximo:** 10 segundos
-
-**Secuencia:** 1s → 2s → 4s → Fallo final
-
-### 3️ Bulkhead (Aislamiento de Recursos)
-**Propósito:** Limitar conexiones simultáneas para evitar saturación.
-
-- **API Gateway → Reservas:** 50 conexiones máximas
-- **Reservas → Pagos:** 10 conexiones máximas
-
-### 4️ Rate Limiting (Limitación de Tasa)
-**Propósito:** Proteger el sistema de abuso y sobrecarga.
-
-- **Límite general:** 100 solicitudes/minuto por IP
-- **Límite de reservas:** 20 solicitudes/minuto por IP
-- **Ventana:** Deslizante de 60 segundos
-
-### 5️ Lock Distribuido (Redlock)
-**Propósito:** Garantizar exclusividad en transacciones críticas.
-
-- **TTL:** 10 segundos
-- **Reintentos:** 10 intentos
-- **Retardo base:** 200ms
-- **Jitter:** ±200ms (aleatoriedad)
-
-**Usado en:** Reservas de últimos asientos, evita race conditions.
-
-### 6️ Patrón Saga
-**Propósito:** Coordinar transacciones distribuidas entre servicios.
-
-- **Compensación automática:** Si un paso falla, se revierten los anteriores
-- **Secuencia:** Reserva → Pago → Notificación
-- **Rollback en cascada:** Si pago falla, se libera la reserva
-
-##  Conceptos Clave Demostrados
-
-| Concepto | Definición | Ejemplo en el Sistema |
-|----------|-----------|----------------------|
-| **Degradación Controlada** | El sistema sigue funcionando (con capacidad reducida) cuando falla un componente | Si pagos cae, se pone en cola la transacción |
-| **Fail Fast** | Detección rápida de fallos para evitar bloqueos prolongados | Circuit Breaker abre inmediatamente tras 50% de errores |
-| **Aislamiento de Fallos** | Un fallo no se propaga a todo el sistema | Bulkhead limita conexiones para evitar cascada |
-| **Consistencia Eventual** | Integridad de datos en entornos distribuidos | Saga asegura que todas las operaciones se completen o revierten |
-| **Transacciones Compensatorias** | Reversión automática de operaciones fallidas | Si pago falla, se libera automáticamente el asiento reservado |
-
----
-
-##  Testing y Monitoreo
-
-### Verificar Salud del Sistema
-```bash
-curl http://localhost:3000/health
-```
-
-**Respuesta esperada:**
-```json
-{
-  "status": "healthy",
-  "services": {
-    "reservas": "up",
-    "inventario": "up",
-    "pagos": "up",
-    "notificaciones": "up"
-  },
-  "timestamp": "2026-01-28T10:30:00Z"
-}
-```
-
-### Ver Métricas en Tiempo Real
-```bash
-curl http://localhost:3000/metrics
-```
-
-Muestra estadísticas de Rate Limiting, Circuit Breakers abiertos, y latencias.
-
-### Limpiar Docker
-```bash
-# Detener todos los servicios
-docker-compose down
-
-# Eliminar volúmenes (borrar datos)
-docker-compose down -v
-
-# Ver logs de un servicio específico
-docker-compose logs -f reservas
-```
-
----
-
-##  Pruebas de Tolerancia a Fallos
-
-El sistema esta disenado para **NO colapsar** cuando ocurren fallos. Puedes probarlo de 2 formas:
-
-### Opcion 1: Script Automatico (Recomendado)
-
-```powershell
-# Ejecutar todas las pruebas automaticamente
-.\test-fallos.ps1
-```
-
-Este script prueba:
-- Apagar servicio de inventario (Circuit Breaker + Cache Fallback)
-- Inyectar latencia en pagos (Timeout Detection)
-- Apagar Redis (Fallback a memoria)
-- Ver metricas del sistema
-
-### Opcion 2: Pruebas Manuales
-
-```powershell
-# 1. Apagar servicio de inventario
-docker stop reservas-inventario
-
-# 2. Probar que sigue funcionando
-curl http://localhost:3000/api/inventario
-# Deberia responder con cache, NO error 500
-
-# 3. Recuperar servicio
-docker start reservas-inventario
-```
-
-### Opcion 3: Interfaz Web Interactiva
-
-1. Abre http://localhost:3000
-2. Ve a las demos interactivas
-3. Configura parametros (usuarios, eventos, asientos)
-4. Ejecuta y observa los logs en tiempo real
-
-### Documentacion Completa de Pruebas
-
-Consulta `PRUEBAS_DOCKER.md` para ver:
-- 7 escenarios de fallo diferentes
-- Comandos exactos para cada prueba
-- Que deberia pasar en cada caso
-- Como verificar que NO colapsa
-- Lista de patrones activados
-
----
-
-##  Stack Tecnológico
-
-| Tecnología | Propósito |
-|-----------|----------|
-| **Node.js + Express** | Runtime y framework web |
-| **Redis + ioredis** | Almacenamiento distribuido y caché |
-| **Redlock** | Locks distribuidos |
-| **Opossum** | Circuit Breaker |
-| **express-rate-limit** | Rate limiting |
-| **Axios** | Cliente HTTP |
-| **Winston** | Logging estructurado |
-| **Docker** | Contenerización |
-| **Docker Compose** | Orquestación local |
-
----
-
+33 pruebas con `node:test`: la parte de resiliencia por separado (reintentos solo
+de lo idempotente, breaker, timeout, bulkhead) y cada servicio con un Redis real
+(50 pedidos simultáneos por 5 asientos, compensación al rechazar el pago, pago
+pendiente que confirma el conciliador, anulación al vencer el plazo, reintento
+de asientos por devolver, idempotencia, rate limiting, descarte y caché).
+`scripts/probar.sh` corre las cuatro demostraciones contra el `docker compose`
+levantado; la CI hace las dos cosas.
+
+## De dónde sale
+
+En 2026 se revisó el proyecto (antes `SistemadeReservas`) y se corrigió la
+lógica de fondo, no solo lo que se veía en el panel: sobreventa cuando Redis
+fallaba, pagos y reservas que se reintentaban sin idempotencia (cobros dobles),
+un lock que vencía durante el cobro, latencia simulada que no se activaba,
+métricas inventadas y demos que no pasaban por los patrones que decían mostrar.
+Se reemplazaron las guías largas y el script de PowerShell por este README,
+`docs/fallos.md` y pruebas automáticas.
+
+## Autores
+
+- Michael Lata ([@Whiteherobot](https://github.com/Whiteherobot))
+- Michael Franco ([@michfranko](https://github.com/michfranko))
+
+Licencia MIT.
