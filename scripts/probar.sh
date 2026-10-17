@@ -11,7 +11,8 @@ mal() { echo "MAL  $1"; fallos=$((fallos + 1)); }
 
 r=$(demo inventario-fantasma)
 echo "$r" | grep -q 'no se vendió ningún asiento fantasma' && ok 'inventario caído: sin ventas fantasma' || mal 'inventario caído'
-echo "$r" | grep -q '"resultado":"201' && ok 'se recupera tras el breaker' || mal 'recuperación'
+# 201, o 402 si el banco simulado rechazó la tarjeta (5 %): en ambos casos el inventario volvió a responder.
+echo "$r" | grep -Eq '"resultado":"(201|402) ' && ok 'se recupera tras el breaker' || { mal 'recuperación'; echo "$r"; }
 
 r=$(demo pasarela-lenta '{"latenciaMs":8000}')
 echo "$r" | grep -q '202 en' && ok 'pasarela lenta: 202 sin esperar' || mal 'pasarela lenta: 202'
