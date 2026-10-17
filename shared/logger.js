@@ -1,28 +1,17 @@
 const winston = require('winston');
 
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    winston.format.errors({ stack: true }),
-    winston.format.splat(),
-    winston.format.json()
-  ),
-  defaultMeta: { service: 'sistema-reservas' },
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.printf(({ level, message, timestamp, service, ...metadata }) => {
-          let msg = `${timestamp} [${service}] ${level}: ${message}`;
-          if (Object.keys(metadata).length > 0) {
-            msg += ` ${JSON.stringify(metadata)}`;
-          }
-          return msg;
-        })
-      )
-    })
-  ]
-});
+const formato = winston.format.printf(({ level, message, timestamp, servicio }) =>
+  `${timestamp} [${servicio}] ${level}: ${message}`);
 
-module.exports = logger;
+module.exports = function crearLogger(servicio) {
+  return winston.createLogger({
+    level: process.env.LOG_LEVEL || 'info',
+    silent: process.env.NODE_ENV === 'test',
+    defaultMeta: { servicio },
+    format: winston.format.combine(
+      winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+      formato
+    ),
+    transports: [new winston.transports.Console()]
+  });
+};
