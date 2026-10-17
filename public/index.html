@@ -4,1055 +4,145 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Reservas - Panel de Control</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        header {
-            background: white;
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            margin-bottom: 30px;
-        }
-
-        h1 {
-            color: #333;
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }
-
-        .subtitle {
-            color: #666;
-            font-size: 1.1em;
-        }
-
-        .status-bar {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .status-card {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-
-        .status-card h3 {
-            color: #555;
-            font-size: 0.9em;
-            text-transform: uppercase;
-            margin-bottom: 10px;
-        }
-
-        .status-value {
-            font-size: 2em;
-            font-weight: bold;
-            color: #667eea;
-        }
-
-        .status-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 8px;
-        }
-
-        .status-online {
-            background: #10b981;
-            animation: pulse 2s infinite;
-        }
-
-        .status-offline {
-            background: #ef4444;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .main-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-        }
-
-        .section {
-            background: white;
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-
-        .section h2 {
-            color: #333;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 3px solid #667eea;
-        }
-
-        .demo-grid {
-            display: grid;
-            gap: 15px;
-        }
-
-        .demo-card {
-            border: 2px solid #e5e7eb;
-            border-radius: 10px;
-            padding: 20px;
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-
-        .demo-card:hover {
-            border-color: #667eea;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
-        }
-
-        .demo-title {
-            font-size: 1.2em;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 8px;
-        }
-
-        .demo-description {
-            color: #666;
-            font-size: 0.9em;
-            margin-bottom: 15px;
-        }
-
-        .demo-button {
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.9em;
-            transition: background 0.3s;
-            width: 100%;
-        }
-
-        .demo-button:hover {
-            background: #5568d3;
-        }
-
-        .demo-button:disabled {
-            background: #9ca3af;
-            cursor: not-allowed;
-        }
-
-        .demo-menu {
-            display: grid;
-            grid-template-columns: 1fr 2fr;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        .menu-list {
-            background: #f9fafb;
-            border-radius: 10px;
-            padding: 15px;
-            border: 1px solid #e5e7eb;
-        }
-
-        .menu-button {
-            display: block;
-            width: 100%;
-            text-align: left;
-            border: 1px solid #e5e7eb;
-            background: white;
-            padding: 10px 12px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            transition: border 0.2s, background 0.2s;
-            font-size: 0.9em;
-        }
-
-        .menu-button.active {
-            border-color: #667eea;
-            background: #eef2ff;
-        }
-
-        .demo-visual {
-            background: white;
-            border-radius: 10px;
-            padding: 15px;
-            border: 1px solid #e5e7eb;
-        }
-
-        .demo-visual h3 {
-            font-size: 1em;
-            color: #374151;
-            margin-bottom: 8px;
-        }
-
-        .status-pill {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 999px;
-            font-size: 0.8em;
-            font-weight: 600;
-            margin-left: 8px;
-        }
-
-        .status-idle { background: #e5e7eb; color: #374151; }
-        .status-running { background: #fde68a; color: #92400e; }
-        .status-success { background: #bbf7d0; color: #166534; }
-        .status-error { background: #fecaca; color: #991b1b; }
-
-        .impact-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-
-        .impact-item {
-            padding: 6px 0;
-            border-bottom: 1px solid #f3f4f6;
-            color: #4b5563;
-            font-size: 0.9em;
-        }
-
-        .impact-item:last-child {
-            border-bottom: none;
-        }
-
-        .demo-input {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 5px;
-            margin-bottom: 10px;
-            font-size: 0.9em;
-        }
-
-        .demo-label {
-            display: block;
-            color: #374151;
-            font-size: 0.85em;
-            margin-bottom: 5px;
-            font-weight: 600;
-        }
-
-        .input-group {
-            margin-bottom: 15px;
-        }
-
-        .service-list {
-            display: grid;
-            gap: 10px;
-        }
-
-        .service-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px;
-            background: #f9fafb;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-        }
-
-        .service-name {
-            font-weight: 600;
-            color: #333;
-        }
-
-        .service-status {
-            display: flex;
-            align-items: center;
-            font-size: 0.9em;
-            color: #666;
-        }
-
-        .log-container {
-            background: #1f2937;
-            color: #10b981;
-            padding: 20px;
-            border-radius: 10px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.85em;
-            height: 400px;
-            overflow-y: auto;
-            margin-top: 20px;
-        }
-
-        .log-entry {
-            margin-bottom: 5px;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
-        .log-time {
-            color: #60a5fa;
-        }
-
-        .log-info {
-            color: #10b981;
-        }
-
-        .log-warn {
-            color: #fbbf24;
-        }
-
-        .log-error {
-            color: #ef4444;
-        }
-
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        .metric-box {
-            background: #f9fafb;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-        }
-
-        .metric-label {
-            font-size: 0.85em;
-            color: #666;
-            margin-bottom: 5px;
-        }
-
-        .metric-value {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #667eea;
-        }
-
-        .full-width {
-            grid-column: 1 / -1;
-        }
-
-        .event-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-
-        .event-card {
-            background: #f8fafc;
-            border-radius: 12px;
-            padding: 20px;
-            border: 1px solid #e2e8f0;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            position: relative;
-            transition: transform 0.2s;
-        }
-
-        .event-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-
-        .event-name {
-            font-size: 1.25em;
-            font-weight: bold;
-            color: #1e293b;
-        }
-
-        .event-price {
-            font-size: 1.5em;
-            font-weight: 800;
-            color: #667eea;
-        }
-
-        .event-seats {
-            font-size: 0.9em;
-            color: #64748b;
-        }
-
-        .badge-resilience {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: #fef3c7;
-            color: #92400e;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.7em;
-            font-weight: bold;
-            display: none;
-        }
-
-        .event-card.from-cache .badge-resilience {
-            display: block;
-        }
-
-        .booking-form {
-            display: grid;
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .btn-book {
-            background: #10b981;
-            color: white;
-            border: none;
-            padding: 10px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .btn-book:hover {
-            background: #059669;
-        }
-
-        .btn-book:disabled {
-            background: #94a3b8;
-        }
-
-        @media (max-width: 1024px) {
-            .main-content {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="estilos.css">
 </head>
 <body>
     <div class="container">
         <header>
             <h1>Sistema de Reservas - Panel de Control</h1>
-            <p class="subtitle">Tolerancia a Fallos en Sistemas Distribuidos</p>
+            <p class="subtitle">Tolerancia a fallos en sistemas distribuidos</p>
         </header>
 
         <div class="status-bar">
             <div class="status-card">
-                <h3>Estado del Sistema</h3>
+                <h3>Estado del sistema</h3>
                 <div class="status-value">
-                    <span class="status-indicator status-online"></span>
-                    <span id="system-status">Operacional</span>
+                    <span class="status-indicator" id="indicador-sistema"></span>
+                    <span id="estado-sistema">Consultando...</span>
                 </div>
             </div>
             <div class="status-card">
-                <h3>Servicios Activos</h3>
-                <div class="status-value" id="services-count">0/5</div>
+                <h3>Servicios activos</h3>
+                <div class="status-value" id="servicios-activos">-</div>
             </div>
             <div class="status-card">
-                <h3>Latencia Promedio</h3>
-                <div class="status-value" id="latency">-- ms</div>
+                <h3>Latencia p50 / p95</h3>
+                <div class="status-value" id="latencia">-</div>
             </div>
             <div class="status-card">
-                <h3>Solicitudes/min</h3>
-                <div class="status-value" id="requests">0</div>
+                <h3>Solicitudes último minuto</h3>
+                <div class="status-value" id="solicitudes">-</div>
             </div>
         </div>
 
         <div class="section full-width" style="margin-bottom: 30px;">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #10b981; margin-bottom: 20px; padding-bottom: 15px;">
-                <h2 style="margin-bottom: 0; border-bottom: none;">🛒 Venta de Entradas (Storefront)</h2>
-                <button class="demo-button" onclick="loadEvents()" style="width: auto; background: #10b981;">Actualizar Cartelera</button>
+                <h2 style="margin-bottom: 0; border-bottom: none;">Venta de entradas</h2>
+                <button class="demo-button" id="actualizar-cartelera" style="width: auto; background: #10b981;">Actualizar cartelera</button>
             </div>
-            <p class="subtitle">Aquí puedes realizar reservas manualmente. Los datos se obtienen en tiempo real de los microservicios.</p>
-            <div id="event-grid" class="event-grid">
-                <!-- Los eventos se cargarán aquí -->
-                <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #64748b;">
-                    Cargando cartelera de eventos...
-                </div>
-            </div>
+            <div id="cartelera" class="event-grid"></div>
+            <p class="aviso" id="aviso-reserva" role="status"></p>
         </div>
 
         <div class="main-content">
             <div class="section">
-                <h2>Demostraciones de Fallos</h2>
-                <div class="demo-menu">
-                    <div class="menu-list">
-                        <button class="menu-button active" data-demo="inventario-fantasma" onclick="selectDemo('inventario-fantasma')">Fallo #1: Inventario Fantasma</button>
-                        <button class="menu-button" data-demo="pasarela-lenta" onclick="selectDemo('pasarela-lenta')">Fallo #2: Pasarela Lenta</button>
-                        <button class="menu-button" data-demo="diluvio-peticiones" onclick="selectDemo('diluvio-peticiones')">Fallo #3: Diluvio de Peticiones</button>
-                        <button class="menu-button" data-demo="condicion-carrera" onclick="selectDemo('condicion-carrera')">Fallo #4: Condición de Carrera</button>
-                    </div>
-                    <div class="demo-visual">
-                        <h3 id="demo-visual-title">Inventario Fantasma</h3>
-                        <div>
-                            Estado actual:
-                            <span id="demo-status" class="status-pill status-idle">Listo</span>
-                        </div>
-                        <div style="margin-top: 10px;">
-                            <strong>Impacto esperado:</strong>
-                            <ul class="impact-list" id="demo-impact-list"></ul>
-                        </div>
-                        <div style="margin-top: 10px;">
-                            <strong>Impacto observado:</strong>
-                            <ul class="impact-list" id="demo-observed-list"></ul>
-                        </div>
-                    </div>
-                </div>
+                <h2>Demostraciones de fallos</h2>
                 <div class="demo-grid">
                     <div class="demo-card">
-                        <div class="demo-title">FALLO #1: Inventario Fantasma</div>
-                        <div class="demo-description">Simula la caída total del servicio de inventario. Demuestra Circuit Breaker y Cache Fallback.</div>
+                        <div class="demo-title">Fallo 1: Inventario fantasma</div>
+                        <div class="demo-description">Se cae el servicio de inventario. Circuit breaker, reintentos y cartelera en caché, sin vender asientos a ciegas.</div>
                         <div class="input-group">
-                            <label class="demo-label">Evento a consultar:</label>
-                            <select id="evento-demo1" class="demo-input">
-                                <option value="evento-1">Evento 1 (Rock Concert - 100 asientos)</option>
-                                <option value="evento-2">Evento 2 (Classical Theater - 50 asientos)</option>
-                                <option value="evento-3">Evento 3 (Music Festival - 500 asientos)</option>
-                                <option value="evento-4">Evento 4 (Stand-up Comedy - 1 asiento)</option>
-                            </select>
+                            <label class="demo-label" for="demo1-evento">Evento</label>
+                            <select id="demo1-evento" class="demo-input select-evento"></select>
                         </div>
-                        <button class="demo-button" onclick="runDemo('inventario-fantasma')">Ejecutar Demo</button>
+                        <button class="demo-button" data-demo="inventario-fantasma">Ejecutar</button>
                     </div>
-
                     <div class="demo-card">
-                        <div class="demo-title">FALLO #2: Pasarela Lenta</div>
-                        <div class="demo-description">Pasarela de pagos responde en 20+ segundos. Demuestra Timeout y Procesamiento Asíncrono.</div>
+                        <div class="demo-title">Fallo 2: Pasarela lenta</div>
+                        <div class="demo-description">La pasarela de pagos tarda 12 s. Timeout, reserva con pago pendiente y conciliación en segundo plano.</div>
                         <div class="input-group">
-                            <label class="demo-label">Evento:</label>
-                            <select id="evento-demo2" class="demo-input">
-                                <option value="evento-1">Evento 1 (Rock Concert)</option>
-                                <option value="evento-2">Evento 2 (Classical Theater)</option>
-                                <option value="evento-3">Evento 3 (Music Festival)</option>
-                            </select>
+                            <label class="demo-label" for="demo2-evento">Evento</label>
+                            <select id="demo2-evento" class="demo-input select-evento"></select>
                         </div>
                         <div class="input-group">
-                            <label class="demo-label">Asientos a reservar:</label>
-                            <input type="number" id="asientos-demo2" class="demo-input" value="2" min="1" max="10">
+                            <label class="demo-label" for="demo2-asientos">Asientos</label>
+                            <input type="number" id="demo2-asientos" class="demo-input" value="1" min="1" max="10">
                         </div>
-                        <button class="demo-button" onclick="runDemo('pasarela-lenta')">Ejecutar Demo</button>
+                        <button class="demo-button" data-demo="pasarela-lenta">Ejecutar</button>
                     </div>
-
                     <div class="demo-card">
-                        <div class="demo-title">FALLO #3: Diluvio de Peticiones</div>
-                        <div class="demo-description">Miles de usuarios simultáneos. Demuestra Rate Limiting, Queuing y Load Shedding.</div>
+                        <div class="demo-title">Fallo 3: Diluvio de peticiones</div>
+                        <div class="demo-description">Muchas reservas al mismo tiempo. Rate limiting, bulkhead con cola acotada y descarte de carga.</div>
                         <div class="input-group">
-                            <label class="demo-label">Numero de usuarios simultaneos:</label>
-                            <input type="number" id="usuarios-demo3" class="demo-input" value="50" min="10" max="200">
+                            <label class="demo-label" for="demo3-usuarios">Pedidos simultáneos</label>
+                            <input type="number" id="demo3-usuarios" class="demo-input" value="60" min="10" max="200">
                         </div>
-                        <div class="input-group">
-                            <label class="demo-label">Evento a reservar:</label>
-                            <select id="evento-demo3" class="demo-input">
-                                <option value="evento-1">Evento 1 (Rock Concert)</option>
-                                <option value="evento-2">Evento 2 (Classical Theater)</option>
-                                <option value="evento-3">Evento 3 (Music Festival)</option>
-                            </select>
-                        </div>
-                        <button class="demo-button" onclick="runDemo('diluvio-peticiones')">Ejecutar Demo</button>
+                        <button class="demo-button" data-demo="diluvio-peticiones">Ejecutar</button>
                     </div>
-
                     <div class="demo-card">
-                        <div class="demo-title">FALLO #4: Condición de Carrera</div>
-                        <div class="demo-description">Múltiples usuarios reservando el último asiento. Demuestra Distributed Locks (Redlock).</div>
+                        <div class="demo-title">Fallo 4: Condición de carrera</div>
+                        <div class="demo-description">Varios usuarios piden los últimos asientos a la vez. Asignación atómica en Redis.</div>
                         <div class="input-group">
-                            <label class="demo-label">Numero de usuarios compitiendo:</label>
-                            <input type="number" id="usuarios-demo4" class="demo-input" value="10" min="2" max="50">
+                            <label class="demo-label" for="demo4-usuarios">Usuarios</label>
+                            <input type="number" id="demo4-usuarios" class="demo-input" value="10" min="2" max="30">
                         </div>
                         <div class="input-group">
-                            <label class="demo-label">Asientos disponibles:</label>
-                            <input type="number" id="asientos-demo4" class="demo-input" value="1" min="1" max="5">
+                            <label class="demo-label" for="demo4-asientos">Asientos disponibles</label>
+                            <input type="number" id="demo4-asientos" class="demo-input" value="1" min="1" max="5">
                         </div>
-                        <button class="demo-button" onclick="runDemo('condicion-carrera')">Ejecutar Demo</button>
+                        <button class="demo-button" data-demo="condicion-carrera">Ejecutar</button>
                     </div>
                 </div>
             </div>
 
             <div class="section">
                 <h2>Microservicios</h2>
-                <div class="service-list">
-                    <div class="service-item">
-                        <span class="service-name">API Gateway</span>
-                        <span class="service-status">
-                            <span class="status-indicator" id="status-gateway"></span>
-                            <span id="port-gateway">Puerto 3000</span>
-                        </span>
-                    </div>
-                    <div class="service-item">
-                        <span class="service-name">Servicio de Reservas</span>
-                        <span class="service-status">
-                            <span class="status-indicator" id="status-reservas"></span>
-                            <span id="port-reservas">Puerto 3001</span>
-                        </span>
-                    </div>
-                    <div class="service-item">
-                        <span class="service-name">Servicio de Inventario</span>
-                        <span class="service-status">
-                            <span class="status-indicator" id="status-inventario"></span>
-                            <span id="port-inventario">Puerto 3002</span>
-                        </span>
-                    </div>
-                    <div class="service-item">
-                        <span class="service-name">Servicio de Pagos</span>
-                        <span class="service-status">
-                            <span class="status-indicator" id="status-pagos"></span>
-                            <span id="port-pagos">Puerto 3003</span>
-                        </span>
-                    </div>
-                    <div class="service-item">
-                        <span class="service-name">Servicio de Notificaciones</span>
-                        <span class="service-status">
-                            <span class="status-indicator" id="status-notificaciones"></span>
-                            <span id="port-notificaciones">Puerto 3004</span>
-                        </span>
-                    </div>
-                </div>
-
+                <div class="service-list" id="servicios"></div>
                 <div class="metrics-grid">
                     <div class="metric-box">
-                        <div class="metric-label">Circuit Breaker</div>
-                        <div class="metric-value" id="circuit-status">CLOSED</div>
+                        <div class="metric-label">Breaker reservas</div>
+                        <div class="metric-value" id="breaker-reservas">-</div>
                     </div>
                     <div class="metric-box">
-                        <div class="metric-label">Cola Activa</div>
-                        <div class="metric-value" id="queue-size">0</div>
+                        <div class="metric-label">Breaker inventario</div>
+                        <div class="metric-value" id="breaker-inventario">-</div>
                     </div>
                     <div class="metric-box">
-                        <div class="metric-label">Cache Hits</div>
-                        <div class="metric-value" id="cache-hits">0%</div>
+                        <div class="metric-label">Reservas en curso / en cola</div>
+                        <div class="metric-value" id="bulkhead">-</div>
                     </div>
                     <div class="metric-box">
-                        <div class="metric-label">Locks Activos</div>
-                        <div class="metric-value" id="active-locks">0</div>
+                        <div class="metric-label">Descartadas por carga</div>
+                        <div class="metric-value" id="descartadas">-</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Pendientes de conciliar</div>
+                        <div class="metric-value" id="pendientes">-</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Cartelera desde caché</div>
+                        <div class="metric-value" id="cache">-</div>
                     </div>
                 </div>
             </div>
 
             <div class="section full-width">
-                <h2>Logs del Sistema</h2>
-                <div class="log-container" id="logs">
-                    <div class="log-entry log-info">
-                        <span class="log-time">[INFO]</span> Sistema de reservas iniciado correctamente
-                    </div>
-                    <div class="log-entry log-info">
-                        <span class="log-time">[INFO]</span> Esperando conexión a servicios...
-                    </div>
-                </div>
+                <h2>Reservas recientes</h2>
+                <table class="tabla-reservas">
+                    <thead>
+                        <tr><th>Hora</th><th>Usuario</th><th>Evento</th><th class="num">Asientos</th><th class="num">Total</th><th>Estado</th><th></th></tr>
+                    </thead>
+                    <tbody id="reservas"></tbody>
+                </table>
+            </div>
+
+            <div class="section full-width">
+                <h2>Registro de la demostración</h2>
+                <div class="log-container" id="registro"></div>
             </div>
         </div>
     </div>
 
-    <script>
-        const API_BASE = 'http://localhost:3000';
-        const services = [
-            { name: 'gateway', port: 3000, url: 'http://localhost:3000/health' },
-            { name: 'reservas', port: 3001, url: 'http://localhost:3001/health' },
-            { name: 'inventario', port: 3002, url: 'http://localhost:3002/health' },
-            { name: 'pagos', port: 3003, url: 'http://localhost:3003/health' },
-            { name: 'notificaciones', port: 3004, url: 'http://localhost:3004/health' }
-        ];
-
-        const demoConfig = {
-            'inventario-fantasma': {
-                title: 'Inventario Fantasma',
-                impact: [
-                    'Inventario responde con error o timeout',
-                    'Circuit Breaker protege el sistema',
-                    'Cache fallback si hay datos previos'
-                ]
-            },
-            'pasarela-lenta': {
-                title: 'Pasarela Lenta',
-                impact: [
-                    'Timeout detectado en pagos',
-                    'Reserva no bloquea al usuario',
-                    'Procesamiento asincrono en background'
-                ]
-            },
-            'diluvio-peticiones': {
-                title: 'Diluvio de Peticiones',
-                impact: [
-                    'Rate Limiting limita la carga',
-                    'Bulkhead protege la concurrencia',
-                    'Cola administra exceso de solicitudes'
-                ]
-            },
-            'condicion-carrera': {
-                title: 'Condicion de Carrera',
-                impact: [
-                    'Locks distribuidos evitan sobreventa',
-                    'Solo un usuario obtiene el ultimo asiento',
-                    'Rechazos controlados por disponibilidad'
-                ]
-            }
-        };
-
-        function addLog(message, type = 'info') {
-            const logsContainer = document.getElementById('logs');
-            const time = new Date().toLocaleTimeString();
-            const logEntry = document.createElement('div');
-            logEntry.className = `log-entry log-${type}`;
-            logEntry.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
-            logsContainer.appendChild(logEntry);
-            logsContainer.scrollTop = logsContainer.scrollHeight;
-        }
-
-        function clearLogs() {
-            const logsContainer = document.getElementById('logs');
-            logsContainer.innerHTML = '';
-        }
-
-        function selectDemo(demoName) {
-            const config = demoConfig[demoName];
-            if (!config) return;
-
-            document.getElementById('demo-visual-title').textContent = config.title;
-            const impactList = document.getElementById('demo-impact-list');
-            impactList.innerHTML = '';
-            config.impact.forEach(item => {
-                const li = document.createElement('li');
-                li.className = 'impact-item';
-                li.textContent = item;
-                impactList.appendChild(li);
-            });
-
-            const observedList = document.getElementById('demo-observed-list');
-            observedList.innerHTML = '<li class="impact-item">Sin ejecucion todavia</li>';
-
-            document.querySelectorAll('.menu-button').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.demo === demoName);
-            });
-        }
-
-        function setDemoStatus(status, type) {
-            const statusEl = document.getElementById('demo-status');
-            statusEl.className = `status-pill status-${type}`;
-            statusEl.textContent = status;
-        }
-
-        function updateObserved(result) {
-            const observedList = document.getElementById('demo-observed-list');
-            observedList.innerHTML = '';
-
-            const items = [];
-            if (result.metricas) {
-                Object.entries(result.metricas).forEach(([key, value]) => {
-                    if (key !== 'errors') {
-                        items.push(`${key}: ${value}`);
-                    }
-                });
-            }
-
-            if (result.steps) {
-                result.steps.slice(0, 3).forEach(step => {
-                    if (step.result) {
-                        items.push(step.result);
-                    }
-                });
-            }
-
-            if (items.length === 0) {
-                items.push('Sin datos observados');
-            }
-
-            items.forEach(item => {
-                const li = document.createElement('li');
-                li.className = 'impact-item';
-                li.textContent = item;
-                observedList.appendChild(li);
-            });
-        }
-
-        async function checkServiceHealth(service) {
-            try {
-                const response = await fetch(service.url, { 
-                    method: 'GET',
-                    mode: 'cors'
-                });
-                return response.ok;
-            } catch (error) {
-                return false;
-            }
-        }
-
-        async function updateServicesStatus() {
-            let activeCount = 0;
-            
-            for (const service of services) {
-                const isHealthy = await checkServiceHealth(service);
-                const indicator = document.getElementById(`status-${service.name}`);
-                
-                if (indicator) {
-                    if (isHealthy) {
-                        indicator.className = 'status-indicator status-online';
-                        activeCount++;
-                    } else {
-                        indicator.className = 'status-indicator status-offline';
-                    }
-                }
-            }
-
-            document.getElementById('services-count').textContent = `${activeCount}/5`;
-            
-            if (activeCount === 5) {
-                document.getElementById('system-status').textContent = 'Operacional';
-            } else if (activeCount > 0) {
-                document.getElementById('system-status').textContent = 'Degradado';
-            } else {
-                document.getElementById('system-status').textContent = 'Offline';
-            }
-        }
-
-        async function runDemo(demoName) {
-            const button = event.target;
-            button.disabled = true;
-            button.textContent = 'Ejecutando...';
-            
-            let params = {};
-            
-            if (demoName === 'inventario-fantasma') {
-                params.eventoId = document.getElementById('evento-demo1').value;
-            } else if (demoName === 'pasarela-lenta') {
-                params.eventoId = document.getElementById('evento-demo2').value;
-                params.asientos = parseInt(document.getElementById('asientos-demo2').value);
-            } else if (demoName === 'diluvio-peticiones') {
-                params.usuarios = parseInt(document.getElementById('usuarios-demo3').value);
-                params.eventoId = document.getElementById('evento-demo3').value;
-            } else if (demoName === 'condicion-carrera') {
-                params.usuarios = parseInt(document.getElementById('usuarios-demo4').value);
-                params.asientosDisponibles = parseInt(document.getElementById('asientos-demo4').value);
-            }
-
-            selectDemo(demoName);
-            setDemoStatus('Ejecutando', 'running');
-            
-            clearLogs();
-            addLog('='.repeat(80), 'info');
-            addLog(`DEMO: ${demoName.toUpperCase().replace(/-/g, ' ')}`, 'info');
-            addLog('='.repeat(80), 'info');
-            
-            if (Object.keys(params).length > 0) {
-                addLog('PARAMETROS:', 'info');
-                Object.entries(params).forEach(([key, value]) => {
-                    const displayKey = key.replace(/([A-Z])/g, ' $1').toUpperCase();
-                    addLog(`  ${displayKey}: ${value}`, 'info');
-                });
-                addLog('', 'info');
-            }
-            
-            addLog('Cargando datos del sistema...', 'info');
-            addLog('', 'info');
-            
-            try {
-                const response = await fetch(`${API_BASE}/demo/${demoName}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(params)
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok && result.success) {
-                    setDemoStatus('Completada', 'success');
-                    updateObserved(result);
-                    addLog(`RESULTADO: COMPLETADA EXITOSAMENTE`, 'success');
-                    addLog(`TIPO: ${result.description}`, 'info');
-                    addLog('', 'info');
-                    
-                    if (result.steps) {
-                        addLog('EJECUCION DETALLADA:', 'info');
-                        result.steps.forEach((step, index) => {
-                            setTimeout(() => {
-                                addLog(`[${step.status.toUpperCase()}] PASO ${step.step}: ${step.action}`, 'info');
-                                if (step.result) {
-                                    addLog(`  OBSERVACION: ${step.result}`, 'success');
-                                }
-                            }, index * 100);
-                        });
-                    }
-                    
-                    if (result.metricas) {
-                        addLog('', 'info');
-                        addLog('METRICAS OBTENIDAS:', 'info');
-                        Object.entries(result.metricas).forEach(([key, value]) => {
-                            if (key !== 'errors') {
-                                const displayKey = key.replace(/([A-Z])/g, ' $1').toUpperCase().trim();
-                                addLog(`  ${displayKey}: ${value}`, 'info');
-                            }
-                        });
-                    }
-                    
-                    if (result.patronesActivados) {
-                        addLog('', 'info');
-                        addLog('PATRONES DE TOLERANCIA CONFIRMADOS:', 'success');
-                        result.patronesActivados.forEach(patron => {
-                            addLog(`  > ${patron}`, 'success');
-                        });
-                    }
-                    
-                    addLog('', 'info');
-                    addLog(`CONCLUSION: ${result.resultado}`, 'success');
-                    addLog('='.repeat(80), 'info');
-                    
-                } else {
-                    setDemoStatus('Error controlado', 'error');
-                    addLog(`RESULTADO: ERROR EN EJECUCION`, 'error');
-                    addLog(`MENSAJE: ${result.error || 'Error desconocido'}`, 'error');
-                    updateObserved({ metricas: { error: result.error || 'Error desconocido' } });
-                    if (result.steps) {
-                        addLog('Pasos completados antes del error:', 'info');
-                        result.steps.forEach(step => {
-                            addLog(`  PASO ${step.step}: ${step.status}`, 'info');
-                        });
-                    }
-                    addLog('='.repeat(80), 'info');
-                }
-            } catch (error) {
-                setDemoStatus('Error', 'error');
-                addLog(`RESULTADO: ERROR`, 'error');
-                addLog(`MENSAJE: ${error.message}`, 'error');
-                updateObserved({ metricas: { error: error.message } });
-                addLog('Accion: Verificar que todos los servicios esten corriendo', 'warn');
-                addLog('='.repeat(80), 'info');
-            } finally {
-                button.disabled = false;
-                button.textContent = 'Ejecutar Demo';
-            }
-        }
-
-        async function updateMetrics() {
-            try {
-                const response = await fetch(`${API_BASE}/metrics`);
-                if (response.ok) {
-                    const metrics = await response.json();
-                    
-                    document.getElementById('latency').textContent = 
-                        metrics.latency ? `${metrics.latency}ms` : '-- ms';
-                    document.getElementById('requests').textContent = 
-                        metrics.requestsPerMinute || 0;
-                    document.getElementById('circuit-status').textContent = 
-                        metrics.circuitBreaker?.status || 'CLOSED';
-                    document.getElementById('queue-size').textContent = 
-                        metrics.queue?.size || 0;
-                    document.getElementById('cache-hits').textContent = 
-                        metrics.cache?.hitRate ? `${metrics.cache.hitRate}%` : '0%';
-                    document.getElementById('active-locks').textContent = 
-                        metrics.locks?.active || 0;
-                }
-            } catch (error) {
-                console.error('Error fetching metrics:', error);
-            }
-        }
-
-        async function loadEvents() {
-            addLog('Cargando eventos desde el API Gateway...', 'info');
-            const grid = document.getElementById('event-grid');
-            
-            try {
-                const response = await fetch(`${API_BASE}/api/inventario`);
-                if (!response.ok) throw new Error('Error al obtener inventario');
-                
-                const events = await response.json();
-                const fromCache = response.headers.get('X-Inventory-Cache') === 'true';
-                
-                grid.innerHTML = '';
-                events.forEach(event => {
-                    const card = document.createElement('div');
-                    card.className = `event-card ${fromCache ? 'from-cache' : ''}`;
-                    card.innerHTML = `
-                        <div class="badge-resilience">MODO RESILIENTE (CACHE)</div>
-                        <div class="event-name">${event.nombre}</div>
-                        <div class="event-price">$${event.precio}</div>
-                        <div class="event-seats">Quedan ${event.asientosDisponibles} asientos</div>
-                        <form class="booking-form" onsubmit="makeReservation(event, '${event.id}')">
-                            <input type="email" placeholder="Tu email" required class="demo-input" style="margin-bottom: 0">
-                            <input type="number" value="1" min="1" max="5" required class="demo-input" style="margin-bottom: 0">
-                            <button type="submit" class="btn-book">Reservar Ahora</button>
-                        </form>
-                    `;
-                    grid.appendChild(card);
-                });
-
-                if (fromCache) {
-                    addLog('ATENCION: Se están mostrando datos de CACHE porque el servicio de inventario falló.', 'warn');
-                } else {
-                    addLog(`Cartelera actualizada: ${events.length} eventos disponibles.`, 'success');
-                }
-            } catch (error) {
-                addLog(`Error al cargar cartelera: ${error.message}`, 'error');
-                grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #ef4444;">
-                    Error al cargar eventos. El API Gateway o el servicio de inventario podrían estar fuera de línea.
-                </div>`;
-            }
-        }
-
-        async function makeReservation(e, eventoId) {
-            e.preventDefault();
-            const form = e.target;
-            const email = form.querySelector('input[type="email"]').value;
-            const seats = parseInt(form.querySelector('input[type="number"]').value);
-            const submitBtn = form.querySelector('button');
-
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Procesando...';
-            addLog(`Iniciando reserva manual: ${seats} asientos para ${eventoId}...`, 'info');
-
-            try {
-                const response = await fetch(`${API_BASE}/api/reservas`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        eventoId: eventoId,
-                        asientos: seats,
-                        usuario: email
-                    })
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    addLog(`RESERVA EXITOSA: ID ${result.id}`, 'success');
-                    alert(`¡Reserva confirmada!\nID: ${result.id}\nEvento: ${result.eventoNombre}`);
-                    loadEvents(); // Recargar para actualizar asientos
-                } else {
-                    const errorMsg = result.error || result.message || 'Error desconocido';
-                    addLog(`FALLO EN RESERVA: ${errorMsg}`, 'error');
-                    alert(`Error al reservar: ${errorMsg}`);
-                }
-            } catch (error) {
-                addLog(`ERROR DE RED: No se pudo contactar con el Gateway`, 'error');
-                alert('Error de conexión. El sistema de reservas podría estar caído.');
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Reservar Ahora';
-            }
-        }
-
-        // Cargar eventos al inicio
-        loadEvents();
-
-        updateServicesStatus();
-        setInterval(updateServicesStatus, 5000);
-        
-        updateMetrics();
-        setInterval(updateMetrics, 3000);
-
-        selectDemo('inventario-fantasma');
-        setDemoStatus('Listo', 'idle');
-        addLog('Panel de control cargado', 'info');
-        addLog('Verificando estado de servicios...', 'info');
-    </script>
+    <script src="panel.js"></script>
 </body>
 </html>
